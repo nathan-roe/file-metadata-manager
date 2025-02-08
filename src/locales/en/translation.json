@@ -1,0 +1,21 @@
+{
+  "header": "Image Metadata Manager",
+  "title": "Unlock Your Image's Story",
+  "subtitle": "Effortlessly Upload Your Images and Discover Detailed Metadata,\nfrom Camera Settings to Geographical Data, All in One Place",
+  "dragImage": "Drag image here or click to select files",
+  "attachFile": "Upload as many files as you like to start searching their metadata",
+  "metaDataManagementType": {
+    "parse": {
+      "title": "Parse",
+      "description": ""
+    },
+    "scrub": {
+      "title": "Scrub",
+      "description": ""
+    },
+    "modify": {
+      "title": "Modify",
+      "description": ""
+    }
+  }
+}
