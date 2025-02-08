@@ -1,21 +1,35 @@
 {
-  "header": "Image Metadata Manager",
-  "title": "Unlock Your Image's Story",
-  "subtitle": "Effortlessly Upload Your Images and Discover Detailed Metadata,\nfrom Camera Settings to Geographical Data, All in One Place",
+  "header": "Image Analyzer",
+  "title": "",
+  "subtitle": "",
   "dragImage": "Drag image here or click to select files",
   "attachFile": "Upload as many files as you like to start searching their metadata",
   "metaDataManagementType": {
+    "supportedFileTypes": "This selection only supports JPEG images",
+    "fileTypeError": "The uploaded file type is not supported. Please try again with a JPEG image",
     "parse": {
       "title": "Parse",
-      "description": ""
+      "description": "Retrieve metadata from the image, including camera settings, geographical data, and more"
     },
     "scrub": {
       "title": "Scrub",
-      "description": ""
+      "description": "Remove unnecessary metadata from your image"
     },
     "modify": {
       "title": "Modify",
-      "description": ""
+      "description": "Modify the metadata in your image"
+    },
+    "ocr": {
+      "title": "OCR",
+      "description": "Read character information in your image"
+    },
+    "transcribe": {
+      "title": "Transcribe",
+      "description": "Transcribe a video to get speech information"
+    },
+    "od": {
+      "title": "Object Detection",
+      "description": "Detect objects within your image"
     }
   }
 }

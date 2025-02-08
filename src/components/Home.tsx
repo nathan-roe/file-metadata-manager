@@ -13,12 +13,13 @@ import {
     Button,
     Dialog, Modal, MultiSelect, TextInput, Select,
     List,
-    Divider, LoadingOverlay, ActionIcon
+    Divider, LoadingOverlay, ActionIcon,
+    Menu
 } from "@mantine/core";
 import '@mantine/dropzone/styles.css';
 import ExifReader from "exifreader";
 import {Dropzone, FileWithPath, IMAGE_MIME_TYPE} from "@mantine/dropzone";
-import {IconPhoto, IconUpload, IconX} from "@tabler/icons-react";
+import {IconCaretDown, IconPhoto, IconUpload, IconX} from "@tabler/icons-react";
 import leaflet from 'leaflet';
 import {downloadImageFromSource, formatFileDescription} from "../utils/fileUtils";
 import {useTranslation} from "react-i18next";
@@ -33,24 +34,51 @@ interface FileAttribute {
 enum MetaDataManagementType {
     PARSE = "parse",
     SCRUB = "scrub",
-    MODIFY = "modify"
+    MODIFY = "modify",
+    OCR = "ocr",
+    TRANSCRIBE = "transcribe",
+    OBJECT_DETECTION = "od"
 }
 
 export function Home() {
     const {t} = useTranslation();
     const [modifyFileDialogOpen, setModifyFileDialogOpen] = React.useState(false);
+    const [fileTypeError, setFileTypeError] = React.useState(false);
     const [fileManagementType, setFileManagementType] = React.useState(MetaDataManagementType.PARSE);
     const [modifiedImageSrc, setModifiedImageSrc] = React.useState<string>("");
     const [fileAttributes, setFileAttributes] = React.useState<FileAttribute[]>([]);
     const [uploadedFile, setUploadedFile] = React.useState<FileWithPath>();
 
+    const removeExifDataFromFile = React.useCallback((file: FileWithPath) => {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            try {
+                setModifiedImageSrc(piexif.remove(e.target?.result));
+            } catch (e) {
+                console.error("Failed to remove EXIF data from file: ", e);
+            }
+        };
+        reader.readAsDataURL(file);
+    }, [uploadedFile]);
+
     const handleUpload = React.useCallback((files: FileWithPath[]) => {
         setUploadedFile(files[0]);
+        setModifiedImageSrc("");
+        setFileTypeError(false);
         switch (fileManagementType) {
-            case  MetaDataManagementType.MODIFY:
-                setModifyFileDialogOpen(true);
+            case MetaDataManagementType.MODIFY:
+                if(files[0].type.endsWith("jpeg")) {
+                    setModifyFileDialogOpen(true);
+                } else {
+                    setFileTypeError(true);
+                }
                 break;
             case MetaDataManagementType.SCRUB:
+                if(files[0].type.endsWith("jpeg")) {
+                    removeExifDataFromFile(files[0]);
+                } else {
+                    setFileTypeError(true);
+                }
                 break;
             case MetaDataManagementType.PARSE:
             default:
@@ -66,8 +94,6 @@ export function Home() {
         }
     }, [fileManagementType]);
 
-    console.log("fileAttributes: ", window)
-
     React.useEffect(() => {
         const startingLocation: [number, number] = [0, 0];
         const map = leaflet.map('leaflet-map', {
@@ -80,34 +106,11 @@ export function Home() {
         leaflet.marker(startingLocation).addTo(map);
     }, []);
 
-    console.log("modifiedImageSrc: ", modifiedImageSrc)
-
     return (
-        <>
-            <Grid gutter={0} mt={50}>
-                <Grid.Col span={{base: 12, lg: 6}} px={20}>
-                    <Stack justify="space-between" h="100%" w="100%">
-                        <Stack h="fit-content" w="100%">
-                            <Title ta="center">{t("title")}</Title>
-                            <Text c="dimmed" ta="center" size="lg" maw={580} mx="auto" mt="xl" mb={20}>
-                                {t("subtitle")}
-                            </Text>
-                        </Stack>
-                        {
-                            modifiedImageSrc
-                                ? (
-                                    <Stack>
-                                        <Image src={modifiedImageSrc}/>
-                                        <Button onClick={() => downloadImageFromSource("download.jpeg", modifiedImageSrc)}>
-                                            Download Modified Image
-                                        </Button>
-                                    </Stack>
-                                )
-                                : <Box hidden={!fileAttributes.length} id="leaflet-map" mah={400} h="100%" w="100%"/>
-                        }
-                    </Stack>
-                </Grid.Col>
-                <Grid.Col span={{base: 12, lg: 6}} px={20}>
+        <Grid mt="25px" pt={75} gutter={0} h="calc(100vh - 25px)" style={{overflow: 'auto'}}>
+            <Grid.Col span={{xs: 12, sm: 2, md: 3, xl: 4}}></Grid.Col>
+            <Grid.Col span={{xs: 12, sm: 8, md: 6, xl: 4}}>
+                <Stack gap={0}>
                     <Group w="100%" align="center" justify="space-between">
                         <SegmentedControl
                             data={Object.values(MetaDataManagementType).map(value => ({
@@ -145,26 +148,63 @@ export function Home() {
                             </div>
                         </Group>
                     </Dropzone>
-                    <Container p={0} mah={400} style={{overflow: 'auto'}}>
-                        {fileAttributes.map((fileAttribute: FileAttribute) => (
-                            <Card withBorder>
-                                <Group key={fileAttribute.name} align="center" justify="space-between" w="100%"
-                                       style={{overflowX: 'hidden', flexWrap: 'nowrap', '--group-wrap': 'nowrap'}}>
-                                    <Text mr={50}>{fileAttribute.name}</Text>
-                                    <Text>{fileAttribute.description}</Text>
-                                </Group>
-                            </Card>
-                        ))}
-                    </Container>
-                </Grid.Col>
-            </Grid>
-            <FileModificationDialog
-                open={modifyFileDialogOpen}
-                onClose={() => setModifyFileDialogOpen(false)}
-                setModifiedImageSrc={setModifiedImageSrc}
-                uploadedFile={uploadedFile}
-            />
-        </>
+                    {[MetaDataManagementType.SCRUB, MetaDataManagementType.MODIFY].includes(fileManagementType) && (
+                        <Text size="sm" c={fileTypeError ? "red" : "dimmed"}>
+                            {t(`metaDataManagementType.${fileTypeError ? "fileTypeError" : "supportedFileTypes"}`)}
+                        </Text>
+                    )}
+                    {
+                        (!!fileAttributes.length && [MetaDataManagementType.PARSE].includes(fileManagementType)) && (
+                            <Group mt={20} justify="flex-end">
+                                <Menu>
+                                    <Menu.Target>
+                                        <Button variant="transparent">
+                                            <Text mr={5} mt={2}>Download as</Text>
+                                            <IconCaretDown />
+                                        </Button>
+                                    </Menu.Target>
+                                    <Menu.Dropdown>
+                                        <Menu.Item>CSV</Menu.Item>
+                                        <Menu.Item>JSON</Menu.Item>
+                                    </Menu.Dropdown>
+                                </Menu>
+                            </Group>
+                        )
+                    }
+                    {
+                        modifiedImageSrc
+                            ? (
+                                <Stack>
+                                    <Image src={modifiedImageSrc}/>
+                                    <Button onClick={() => downloadImageFromSource("download.jpeg", modifiedImageSrc)}>
+                                        Download Modified Image
+                                    </Button>
+                                </Stack>
+                            )
+                            : (
+                                <Box hidden={!fileAttributes.length} id="leaflet-map" h={200} w="100%"/>
+                            )
+                    }
+                    {fileAttributes.map((fileAttribute: FileAttribute) => (
+                        <Card withBorder>
+                            <Group key={fileAttribute.name} align="center" justify="space-between" w="100%"
+                                   style={{overflowX: 'hidden', flexWrap: 'nowrap', '--group-wrap': 'nowrap'}}>
+                                <Text mr={50}>{fileAttribute.name}</Text>
+                                <Text>{fileAttribute.description}</Text>
+                            </Group>
+                        </Card>
+                    ))}
+                    <FileModificationDialog
+                        open={modifyFileDialogOpen}
+                        onClose={() => setModifyFileDialogOpen(false)}
+                        setModifiedImageSrc={setModifiedImageSrc}
+                        setFileAttributes={setFileAttributes}
+                        uploadedFile={uploadedFile}
+                    />
+                </Stack>
+            </Grid.Col>
+            <Grid.Col span={{xs: 12, sm: 2, md: 3, xl: 4}}></Grid.Col>
+        </Grid>
     );
 }
 
@@ -187,13 +227,16 @@ const _defaultMetaDataAttributes = {
     [MetadataTypes.ZEROTH]: {},
 }
 
-const formatModifiedAttributes = (attribute: Record<string, unknown>) => {
+const formatModifiedAttributes = (attribute: Record<string, unknown>, typeMap: Record<string, string>) => {
+    const attributeMap: Record<string, unknown> = {}
     Object.entries(attribute).forEach(([key, value]) => {
         try {
-            attribute[key] = JSON.parse(value as string);
-        } catch (e) {}
+            attributeMap[typeMap[key]] = JSON.parse(value as string);
+        } catch (e) {
+            attributeMap[typeMap[key]] = value;
+        }
     });
-    return attribute;
+    return attributeMap;
 }
 
 interface FileModificationDialogProps {
@@ -201,13 +244,15 @@ interface FileModificationDialogProps {
     onClose: () => void;
     uploadedFile?: FileWithPath;
     setModifiedImageSrc: React.Dispatch<React.SetStateAction<string>>;
+    setFileAttributes: React.Dispatch<React.SetStateAction<FileAttribute[]>>;
 }
 
 const FileModificationDialog: React.FC<FileModificationDialogProps> = ({
                                                                            open,
                                                                            onClose,
                                                                            uploadedFile,
-                                                                           setModifiedImageSrc
+                                                                           setModifiedImageSrc,
+                                                                           setFileAttributes
                                                                        }) => {
     const {t} = useTranslation();
     const [updatingFile, setUpdatingFile] = React.useState(false);
@@ -229,37 +274,32 @@ const FileModificationDialog: React.FC<FileModificationDialogProps> = ({
         if (!uploadedFile) {
             return;
         }
-            setUpdatingFile(true);
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                try {
-                const imageData = piexif.load(e.target?.result);
+        setUpdatingFile(true);
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            try {
                 const modifiedData = {
-                    "0th": formatModifiedAttributes(modifiedAttributes[MetadataTypes.ZEROTH]),
-                    "Exif": formatModifiedAttributes(modifiedAttributes[MetadataTypes.EXIF]),
-                    "GPS": formatModifiedAttributes(modifiedAttributes[MetadataTypes.GPS])
+                    "0th": formatModifiedAttributes(modifiedAttributes[MetadataTypes.ZEROTH], piexif.ImageIFD),
+                    "Exif": formatModifiedAttributes(modifiedAttributes[MetadataTypes.EXIF], piexif.ExifIFD),
+                    "GPS": formatModifiedAttributes(modifiedAttributes[MetadataTypes.GPS], piexif.GPSIFD)
                 };
-                Object.keys(modifiedData).forEach(key => {
-                    if(!Object.keys(modifiedData[key as keyof typeof modifiedData]).length) {
-                        delete modifiedData[key as keyof typeof modifiedData];
-                    }
-                });
-                console.log("imageData: ", imageData)
-                Object.keys(modifiedData).forEach(key => {
-                    imageData[key] = {
-                        ...imageData[key],
-                        ...modifiedData[key as keyof typeof modifiedData]
-                    };
-                });
-                const exifStr = piexif.dump(imageData);
+                const exifStr = piexif.dump(modifiedData);
                 setModifiedImageSrc(piexif.insert(exifStr, e.target?.result));
+                const flatModifiedAttributes = Object.values(modifiedAttributes).reduce((a,b) => ({...a, ...b}), {})
+                setFileAttributes(fa => [
+                ...fa.filter(f => !flatModifiedAttributes[f.name]),
+                ...Object.entries(flatModifiedAttributes).map(([key, value]) => ({
+                        name: key,
+                        description: value
+                    }))
+                ] as FileAttribute[])
                 handleClose();
-            } catch(e) {
+            } catch (e) {
                 setUpdatingFile(false);
                 console.error("Failed to update file: ", e);
             }
-            };
-            reader.readAsDataURL(uploadedFile);
+        };
+        reader.readAsDataURL(uploadedFile);
     }, [uploadedFile, modifiedAttributes]);
 
     const updateMetaData = React.useCallback(() => {
@@ -318,7 +358,8 @@ const FileModificationDialog: React.FC<FileModificationDialogProps> = ({
                         </Grid.Col>
                         <Grid.Col span={1.5}>
                             <Group w="100%" justify="flex-end">
-                                <Button w={75} onClick={updateMetaData} disabled={!metaDataValue || updatingFile}>Add</Button>
+                                <Button w={75} onClick={updateMetaData}
+                                        disabled={!metaDataValue || updatingFile}>Add</Button>
                             </Group>
                         </Grid.Col>
                     </Grid>
@@ -338,8 +379,9 @@ const FileModificationDialog: React.FC<FileModificationDialogProps> = ({
                                                 </Grid.Col>
                                                 <Grid.Col span={2}>
                                                     <Group w="100%" justify="flex-end">
-                                                        <ActionIcon size="sm" variant="transparent" onClick={() => removeAttribute(key as MetadataTypes, attribute)}>
-                                                            <IconX />
+                                                        <ActionIcon size="sm" variant="transparent"
+                                                                    onClick={() => removeAttribute(key as MetadataTypes, attribute)}>
+                                                            <IconX/>
                                                         </ActionIcon>
                                                     </Group>
                                                 </Grid.Col>
@@ -364,7 +406,7 @@ const FileModificationDialog: React.FC<FileModificationDialogProps> = ({
                 </Group>
             </Modal>
             {updatingFile && (
-                <LoadingOverlay />
+                <LoadingOverlay/>
             )}
         </>
     );

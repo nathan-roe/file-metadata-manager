@@ -8,8 +8,8 @@ const Header = () => {
     const { setColorScheme, colorScheme } = useMantineColorScheme();
 
     return (
-        <Card withBorder>
-            <Group w="100%" h={20} px={20} justify="space-between" align="center">
+        <Card withBorder style={{position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000}}>
+            <Group w="100%" h='25px' px={20} justify="space-between" align="center">
                 <Group w="fit-content" h="100%" align="center">
                     <IconPhotoSearch />
                     <Text size="sm" fw="bold">{t("header")}</Text>
